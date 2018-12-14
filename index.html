@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+    <title></title>
+    <script src="js/mui.min.js"></script>
+    <script src="js/jquery.js" type="text/javascript" charset="utf-8"></script>
+    <script src="js/modernizr.custom.17475.js" type="text/javascript" charset="utf-8"></script>
+    <script src="js/jquerypp.custom.js" type="text/javascript" charset="utf-8"></script>
+    <script src="js/jquery.elastislide.js" type="text/javascript" charset="utf-8"></script>
+    <script src="https://cdn.socket.io/socket.io-1.2.1.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/custom.css" />
+    <link rel="stylesheet" type="text/css" href="css/elastislide.css" />
+    <link href="css/mui.min.css" rel="stylesheet" />
+    <link href="css/index.css" rel="stylesheet" />
+    <script type="text/javascript" charset="utf-8">
+      mui.init();
+
+      var datetime; // 时间戳
+      var slidertime; // 轮播时间
+      var ws; // websocket连接
+
+      // 建立链接
+      function WS() {
+        ws = new WebSocket('ws://39.105.41.93:8080/smart/websocket/yuanqu');
+        ws.onmessage = function(evt) {
+          var msg = JSON.parse(evt.data);
+          console.log(msg)
+
+        }
+        ws.onerror = function(evt) {
+          console.log('evt')
+          WS()
+        }
+        ws.onclose = function() {
+          console.log('colse')
+          WS()
+        }
+      }
+      WS()
+
+      // 初始化
+      function init() {
+        dateTime();
+        $("#chatbox").children('div').empty().append('<div class="chatbox_left clearfix"><p>您好,很高兴为您服务</p></div>');
+        mui('#chatbox').scroll().reLayout();
+        mui('#chatbox').scroll().scrollToBottom();
+      }
+
+      // 滚动条配置
+      mui.ready(function() {
+        var options = {
+          scrollY: true, //是否竖向滚动
+          scrollX: false, //是否横向滚动
+          startX: 0, //初始化时滚动至x
+          startY: 0, //初始化时滚动至y
+          indicators: true, //是否显示滚动条
+          deceleration: 0.0006, //阻尼系数,系数越小滑动越灵敏
+          bounce: true, //是否启用回弹
+        }
+
+        mui('#chatbox').scroll({
+          deceleration: 0.0005 //flick 减速系数，系数越大，滚动速度越慢，滚动距离越小，默认值0.0006
+        });
+        mui('.mui-scroll-wrapper').scroll({
+          deceleration: 0.0005 //flick 减速系数，系数越大，滚动速度越慢，滚动距离越小，默认值0.0006
+        });
+        mui('#chatbox').scroll().scrollToBottom();
+      })
+
+      // 语音识别
+      function startRecognize() {
+        var options = {};
+        options.engine = 'iFly';
+        //超时时间
+        //options.timeout=5000;
+        options.userInterface = false;
+        options.continue = true;
+
+        plus.speech.startRecognize(options, function(s) {
+          slidertime = 0;
+          $('#chatbox').children('div').append('<div class="chatbox_right clearfix"><p>' + s + '</p></div>');
+          mui('#chatbox').scroll().reLayout();
+          mui('#chatbox').scroll().scrollToBottom();
+          knowledgebase(s);
+        });
+      }
+
+      // 调用知识库
+      function knowledgebase(word) {
+        slidertime = 0;
+
+        var data = {
+          callSign: datetime,
+          chat: word,
+          user: 'admin'
+        }
+        $.ajax({
+          type: "post",
+          url: "http://47.95.205.128:8081/smart/chat/screen",
+          async: true,
+          data: JSON.stringify(data),
+          dataType: 'json',
+          contentType: 'application/json',
+          success: function(r) {
+            slidertime = 0;
+            if(r.result == 'success') {
+              $('#chatbox').children('div').append('<div class="chatbox_left clearfix"><p>' + r.answer + '</p></div>');
+              mui('#chatbox').scroll().reLayout();
+              mui('#chatbox').scroll().scrollToBottom();
+              startTransform(r.answer);
+            } else {
+              $('#chatbox').children('div').append('<div class="chatbox_left clearfix"><p>很抱歉，奥法智能知识库目前没有学习到此问题。您可以拨打人工服务热线：400-666-8800。感谢您的咨询。我们会记录此问题，并邀请专业人员补足答案。</p></div>');
+              mui('#chatbox').scroll().reLayout();
+              mui('#chatbox').scroll().scrollToBottom();
+              startTransform('很抱歉，奥法智能知识库目前没有学习到此问题。您可以拨打人工服务热线：400-666-8800。感谢您的咨询。我们会记录此问题，并邀请专业人员补足答案。');
+            }
+          }
+        });
+      }
+
+      // 语音合成
+      function startTransform(transformword) {
+        slidertime = 0;
+        var receiver;
+
+        receiver = plus.android.implements('com.iflytek.cloud.SynthesizerListener', {
+          onEvent: function(arg0, arg1, arg2, arg3) {
+
+          },
+          onSpeakBegin: function() {
+            slidertime = 0;
+          },
+          onSpeakPaused: function() {
+            slidertime = 0;
+          },
+          onSpeakResumed: function() {
+            slidertime = 0;
+          },
+          onBufferProgress: function(percent, beginPos, endPos, info) {
+            slidertime = 0;
+          },
+          onSpeakProgress: function(percent, beginPos, endPos) {
+            slidertime = 0;
+            // 合成进度
+          },
+          onCompleted: function(error) {
+            slidertime = 0;
+
+            if(transformword.indexOf('结束') != -1 || transformword.indexOf('再见') != -1 || transformword.indexOf('拜拜') != -1 || transformword.indexOf('没问题') != -1) {
+              return;
+            }
+            startRecognize();
+
+          }
+        });
+
+        var main = plus.android.runtimeMainActivity();
+        var SpeechUtility = plus.android.importClass('com.iflytek.cloud.SpeechUtility');
+        SpeechUtility.createUtility(main, "appid=5a6ebba2");
+        var SynthesizerPlayer = plus.android.importClass('com.iflytek.cloud.SpeechSynthesizer');
+        play = SynthesizerPlayer.createSynthesizer(main, null);
+        play.startSpeaking(transformword, receiver);
+      }
+
+      // 时间戳
+      function dateTime() {
+        var date = new Date();
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        var hour = date.getHours();
+        var minute = date.getMinutes();
+        var second = date.getSeconds();
+        if(month < 10) {
+          month = "0" + month.toString()
+        };
+        if(day < 10) {
+          day = "0" + day.toString()
+        };
+        if(hour < 10) {
+          hour = "0" + hour.toString()
+        };
+        if(minute < 10) {
+          minute = "0" + minute.toString()
+        };
+        if(second < 10) {
+          second = "0" + second.toString()
+        };
+        datetime = date.getFullYear().toString() + month + day + hour + minute + second;
+      }
+      dateTime();
+    </script>
+  </head>
+
+  <body>
+    <!--<div style="width: 100%;height: 100%;position: absolute;top: 0;left: 0;background: #ccc;z-index: 888;">
+      
+    </div>-->
+    <div class="c_bg">
+      <img src="images/center.png" />
+    </div>
+
+    <span style="font-size: 8rem!important;position: absolute;top: 50%;right: 1%;z-index: 111;"><img src="images/voice.png"/ style="width: 5.3rem;" onclick="startRecognize()"></span>
+
+    <div class="mui-scroll-wrapper" id="chatbox">
+      <div id="" class="mui-scroll">
+        <div class="chatbox_left clearfix">
+          <p>您好,很高兴为您服务</p>
+        </div>
+        <!--<div class="chatbox_right clearfix">
+          <p>奥斯卡进度更快了解来看淀区留学生创业园。2007年10月，国家人事部和北京市人民政府共建单位——中国北京（海淀）留学人员创业园。经过多年的建设，海淀创业园已经拥有三大孵化基地，培育了一批又一批的优秀企业和企业家，得到了党和国家领导人、</p>
+        </div>-->
+      </div>
+    </div>
+    <script type="text/javascript">
+      $(function() {
+        
+      })
+    </script>
+  </body>
+
+</html>
