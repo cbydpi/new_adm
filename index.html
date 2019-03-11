@@ -13,207 +13,169 @@
     <script type="text/javascript" charset="utf-8">
       mui.init();
 
-      var datetime; // 时间戳
       var slidertime = 0; // 轮播时间
       var ws; // websocket连接
-      var play;
-      var local = JSON.parse(window.localStorage.getItem('command'))
-//    console.log(local)
       var playList = []
-      var imageNum = -1
+      var baseURL = null;
+      var baseID = null;
+      var isInit = false;
+      var imagesArr = [];
+      var imageType = '.jpeg.png.bmp.jpg';
 
-      function qq() {
-        plus.io.requestFileSystem(plus.io.PUBLIC_DOWNLOADS, function(fs) {
-          // fs.root是根目录操作对象DirectoryEntry
-          // 创建读取目录信息对象 
-          console.log(fs)
-          var directoryReader = fs.root.createReader();
-          directoryReader.readEntries(function(entries) {
-            console.log(entries)
-//          if (entries.name = '9f4ed9e0-d1c8-480c-b632-4d12cce4767e') {
-//            for (var i = 0; i < entries.length; i++) {
-//              console.log(entries[i].fullPath)
-//            }
-//          }
-          }, function(e) {
-            console.log(e)
-          });
-        }, function (e) {
-          console.log(e)
-        });
-
-//      plus.io.resolveLocalFileSystemURL('_downloads/', function(entry) {
-//        console.log(entry)
-//          entry.removeRecursively(function(entry) { //递归删除其下的所有文件及子目录
-//              console.log("缓存清理完成");
-//          }, function(e) {
-//              mui.toast(e.message);
-//          });
-//      }, function(e) {
-//          mui.toast('文件路径读取失败');
-//      });
-//              plus.io.resolveLocalFileSystemURL('_downloads/9f4ed9e0-d1c8-480c-b632-4d12cce4767e/', function(entry) {
-//                  console.log(entry);
-//              })
-      }
-      
-      function test () {
-//      plus.io.resolveLocalFileSystemURL( "../storage/", function ( entry ) {
-//        console.log(entry)
-//      }, function ( e ) {
-//        console.log(e)
-//      } );
+      function test() {
         var environment = plus.android.importClass("android.os.Environment");
         var sdRoot = environment.getExternalStorageDirectory();
-//      console.log(sdRoot)
-        var files = plus.android.invoke(sdRoot,"listFiles");
-//      console.log(files)
+        var files = plus.android.invoke(sdRoot, "listFiles");
         var len = files.length;
-        for(var i=0; i<len; i++){
-            for(var i=0;i<len;i++){
-                if(plus.android.invoke(files[i],"isDirectory")){
-//                console.log(plus.android.invoke(files[i],"getName"))
-                  if (plus.android.invoke(files[i],"getName") === 'cbydpi') {
-                    var cbydpifile = plus.android.invoke(files[i],"listFiles");
-                    console.log(sdRoot + '/' + 'cbydpi')
-                  }
-                    // 文件夹
-                }else{
-                    // 文件
+        var cbImage = null
+        console.log(sdRoot + '/cbydpi')
+        for(var i = 0; i < len; i++) {
+          if(plus.android.invoke(files[i], "isDirectory")) {
+            if(plus.android.invoke(files[i], "getName") === 'cbydpi') {
+              isInit = true;
+              var cbydpifile = plus.android.invoke(files[i], "listFiles");
+              for (var j = 0; j < cbydpifile.length; j++) {
+//              console.log(plus.android.invoke(cbydpifile[j], "getName"))
+                if (plus.android.invoke(cbydpifile[j], "isDirectory") && plus.android.invoke(cbydpifile[j], "getName") === 'images') {
+                  cbImage = cbydpifile[j]
                 }
+              }
             }
+            // 文件夹
+          }
         }
         
-//      mui.ajax(
-//        '/storage/emulated/0/cbydpi/package.json',
-//        {
-//          dataType: 'json',
-//          type: 'get',
-//          success: function (data) {
-//            console.log(data)
-//            data = JSON.parse(data)
-//            console.log(data.id)
-//          },
-//          error: function (e) {
-//            console.log(e)
-//          }
-//        }
-//      )
+        if (cbImage !== null) {
+          var imageFiles = plus.android.invoke(cbImage, "listFiles");
+          for (var m = 0; m < imageFiles.length; m++) {
+            var index1 = plus.android.invoke(imageFiles[m], "getName").lastIndexOf('.');
+            var index2 = plus.android.invoke(imageFiles[m], "getName").length;
+            var suffix = plus.android.invoke(imageFiles[m], "getName").substring(index1, index2).toLowerCase()
+            if (imageType.indexOf(suffix) > -1) {
+              imagesArr.push(sdRoot + "/cbydpi/images/" + plus.android.invoke(imageFiles[m], "getName"))
+            }
+          }
+        }
+        
+        if (imagesArr.length >= 1) {
+          $('#slider').remove();
+          var main;
+          for(var i = 0; i < imagesArr.length; i++) {
+            main += '<div class="mui-slider-item"><a href="#"><img src="' + imagesArr[i] + '" /></a></div>'
+          }
+          var s = '<div class="mui-slider" id="slider"><div class="mui-slider-group mui-slider-loop"><div class="mui-slider-item mui-slider-item-duplicate"><a href="#"><img src="' +
+            imagesArr[imagesArr.length - 1] +
+            '" /></a></div>' +
+            main +
+            '<div class="mui-slider-item mui-slider-item-duplicate"><a href="#"><img src="' +
+            imagesArr[0] +
+            '"></a></div></div></div>'
+          $('body').append(s)
+          var gallery = mui('.mui-slider');
+          gallery.slider({
+            interval: 5000, //自动轮播周期，若为0则不自动播放，默认为0；
+          });
+        }
+
         $.ajax({
-        	type:"get",
-        	url:"/storage/emulated/0/cbydpi/package.json",
-        	dataType: 'json',
-        	success: function (data) {
-        	  console.log(data)
-        	}
+          type: "get",
+          url: sdRoot + "/cbydpi/package.json",
+          dataType: 'json',
+          async: false,
+          success: function(data) {
+            console.log(data)
+            baseURL = data.url;
+            baseID = data.id;
+            WS();
+          },
+          error: function (e) {
+            console.log(e.status)
+            var gallery = mui('.mui-slider');
+            gallery.slider({
+              interval: 5000, //自动轮播周期，若为0则不自动播放，默认为0；
+            });
+          }
         });
+        
+        if (isInit == false) {
+          mui.toast('未检测到本地配置',{ duration:'long', type:'div' }) 
+        }
       }
       
-      mui.plusReady(function() {
-        test()
-      });
-
-      var slidetime = setInterval(function() {
-        slidertime = slidertime + 1;
-
-        if(slidertime == 60 && $('#slider').css('display') == 'none') {
-          showSlider()
-        }
-      }, 1000)
-
-      function showSlider() {
-        play.pauseSpeaking(); // 暂停播放
-        $('#slider').show();
-      }
-
-      function createDownload(url, filenames) {
-        var dtask = plus.downloader.createDownload(url, {
-          filename: filenames
-        }, function(d, status) {
-          // 下载完成
-          if(status == 200) {
-            console.log(d)
-            mui.toast("Download success: " + d.filename);
-            playList.push(d.filename)
-          } else {
-            mui.toast("Download failed: " + status);
-          }
-        });
-        dtask.start();
-      }
-
-      function pathChange(url) {
-        return plus.io.convertLocalFileSystemURL(url);
-      }
-
-      // 建立链接
-      function WS() {
-        ws = new WebSocket('ws://39.105.41.93:8080/smart/websocket/yuanqu');
+        //检测网络
+        window.addEventListener('online', function() {
+          //      alert('online')
+          WS();
+        })
+        window.addEventListener('offline', function() {
+          //      alert('offline');
+        })
+      
+      function WS(url, id) {
+        ws = new WebSocket(baseURL + baseID);
         ws.onmessage = function(evt) {
           var msg = JSON.parse(evt.data);
-          if(msg.command == 'update') {
-            window.localStorage.setItem('command', JSON.stringify(msg))
-            var main;
-            imageNum = msg.playlist.resourceList.length
-            for(var i = 0; i < msg.playlist.resourceList.length; i++) {
-              createDownload(msg.playlist.resourceList[i].resource.url, '_downloads/' + msg.issueNum + '/')
+          console.log(msg)
+          if(msg.stauts != undefined) {
+            if(msg.stauts == 0) {
+              beginscreen();
+            } else if(msg.stauts == 1) {
+              beginslide();
+            } else if(msg.stauts == 2) {
+//            StartInteractive();
             }
-            var st = setTimeout(function() {
-              if(playList.length = imageNum) {
-                $('#slider').remove();
-                console.log('finish')
-                console.log(playList)
-                clearTimeout(st)
-                for(var j = 0; j < playList.length; j++) {
-                  main += '<div class="mui-slider-item"><a href="#"><img src="' + pathChange(playList[j]) + '" /></a></div>'
-
-                }
-                var s = '<div class="mui-slider" id="slider"><div class="mui-slider-group mui-slider-loop"><div class="mui-slider-item mui-slider-item-duplicate"><a href="#"><img src="' +
-                  pathChange(playList[playList.length - 1]) +
-                  '" /></a></div>' +
-                  main +
-                  '<div class="mui-slider-item mui-slider-item-duplicate"><a href="#"><img src="' +
-                  pathChange(playList[0]) +
-                  '"></a></div></div></div>'
-                $('body').append(s)
-                var gallery = mui('.mui-slider');
-                gallery.slider({
-                  interval: (msg.playlist.resourceSum / msg.playlist.resourceNum) * 1000, //自动轮播周期，若为0则不自动播放，默认为0；
-                });
-                playList = []
-              }
-            }, 1000)
-            var an = {
-              "command": "update",
-              "issueNum": msg.issueNum,
-              "issueStatus": "0"
-            }
-            ws.send(JSON.stringify(an))
           }
-
         }
         ws.onerror = function(evt) {
-          console.log(evt)
-          WS()
+          console.log('evt')
         }
         ws.onclose = function() {
           console.log('colse')
-          WS()
         }
       }
-      WS()
 
-      // 初始化
-      function init() {
-        dateTime();
-        $("#chatbox").children('div').empty().append('<div class="chatbox_left clearfix"><p>您好,很高兴为您服务</p></div>');
-        mui('#chatbox').scroll().reLayout();
-        mui('#chatbox').scroll().scrollToBottom();
+      mui.plusReady(function() {
+        test()
+      });
+      
+      setInterval(function() {
+        if(!ws || ws.readyState != 1) {
+          WS();
+        }
+        ws.send('{"deviceId":null,"status":null,"myDevice":0,"code":0}');
+      }, 5000)
+      
+      //开始屏保
+      function beginscreen() {
+        ws.send('{"deviceId":null,"status":0,"myDevice":' + baseID + ',"code":666}');
+        $('#screensaver').show();
+        $('#slider').hide()
       }
+      
+      //图片轮播
+      function beginslide() {
+        ws.send('{"deviceId":null,"status":1,"myDevice":' + baseID + ',"code":666}');
+        $('#screensaver').hide();
+        $('#slider').show();
+      }
+
+//    var slidetime = setInterval(function() {
+//      slidertime = slidertime + 1;
+//
+//      if(slidertime == 60 && $('#slider').css('display') == 'none') {
+//        showSlider()
+//      }
+//    }, 1000)
+//
+//    function showSlider() {
+//
+//      $('#slider').show();
+//    }
+
 
       // 滚动条配置
       mui.ready(function() {
-        if(local !== null) {
+        if(baseID) {
           $('#slider').remove();
           var main;
           for(var i = 0; i < local.playlist.resourceList.length; i++) {
@@ -234,157 +196,10 @@
         } else {
           var gallery = mui('.mui-slider');
           gallery.slider({
-            interval: 5000, //自动轮播周期，若为0则不自动播放，默认为0；
+            interval: 1000, //自动轮播周期，若为0则不自动播放，默认为0；
           });
         }
-
-        var options = {
-          scrollY: true, //是否竖向滚动
-          scrollX: false, //是否横向滚动
-          startX: 0, //初始化时滚动至x
-          startY: 0, //初始化时滚动至y
-          indicators: true, //是否显示滚动条
-          deceleration: 0.0006, //阻尼系数,系数越小滑动越灵敏
-          bounce: true, //是否启用回弹
-        }
-
-        mui('#chatbox').scroll({
-          deceleration: 0.0005 //flick 减速系数，系数越大，滚动速度越慢，滚动距离越小，默认值0.0006
-        });
-        mui('.mui-scroll-wrapper').scroll({
-          deceleration: 0.0005 //flick 减速系数，系数越大，滚动速度越慢，滚动距离越小，默认值0.0006
-        });
-        mui('#chatbox').scroll().scrollToBottom();
-        $(document).on('tap', function() {
-          slidertime = 0;
-          if($('#slider').css('display') == 'block') {
-            //          init();
-            $('#slider').hide();
-          }
-        })
       })
-
-      // 语音识别
-      function startRecognize() {
-        var options = {};
-        options.engine = 'iFly';
-        //超时时间
-        //options.timeout=5000;
-        options.userInterface = false;
-        options.continue = true;
-
-        plus.speech.startRecognize(options, function(s) {
-          slidertime = 0;
-          $('#chatbox').children('div').append('<div class="chatbox_right clearfix"><p>' + s + '</p></div>');
-          mui('#chatbox').scroll().reLayout();
-          mui('#chatbox').scroll().scrollToBottom();
-          knowledgebase(s);
-        });
-      }
-
-      // 调用知识库
-      function knowledgebase(word) {
-        slidertime = 0;
-
-        var data = {
-          callSign: datetime,
-          chat: word,
-          user: 'admin'
-        }
-        $.ajax({
-          type: "post",
-          url: "http://39.105.41.93:8080/smart/chat/gridChat",
-          async: true,
-          data: JSON.stringify(data),
-          dataType: 'json',
-          contentType: 'application/json',
-          success: function(r) {
-            slidertime = 0;
-            if(r.result == 'success') {
-              $('#chatbox').children('div').append('<div class="chatbox_left clearfix"><p>' + r.answer + '</p></div>');
-              mui('#chatbox').scroll().reLayout();
-              mui('#chatbox').scroll().scrollToBottom();
-              startTransform(r.answer);
-            } else {
-              $('#chatbox').children('div').append('<div class="chatbox_left clearfix"><p>很抱歉，奥法智能知识库目前没有学习到此问题。您可以拨打人工服务热线：400-666-8800。感谢您的咨询。我们会记录此问题，并邀请专业人员补足答案。</p></div>');
-              mui('#chatbox').scroll().reLayout();
-              mui('#chatbox').scroll().scrollToBottom();
-              startTransform('很抱歉，奥法智能知识库目前没有学习到此问题。您可以拨打人工服务热线：400-666-8800。感谢您的咨询。我们会记录此问题，并邀请专业人员补足答案。');
-            }
-          }
-        });
-      }
-
-      // 语音合成
-      function startTransform(transformword) {
-        slidertime = 0;
-        var receiver;
-
-        receiver = plus.android.implements('com.iflytek.cloud.SynthesizerListener', {
-          onEvent: function(arg0, arg1, arg2, arg3) {
-
-          },
-          onSpeakBegin: function() {
-            slidertime = 0;
-          },
-          onSpeakPaused: function() {
-            slidertime = 0;
-          },
-          onSpeakResumed: function() {
-            slidertime = 0;
-          },
-          onBufferProgress: function(percent, beginPos, endPos, info) {
-            slidertime = 0;
-          },
-          onSpeakProgress: function(percent, beginPos, endPos) {
-            slidertime = 0;
-            // 合成进度
-          },
-          onCompleted: function(error) {
-            slidertime = 0;
-
-            if(transformword.indexOf('结束') != -1 || transformword.indexOf('再见') != -1 || transformword.indexOf('拜拜') != -1 || transformword.indexOf('没问题') != -1) {
-              return;
-            }
-            startRecognize();
-
-          }
-        });
-
-        var main = plus.android.runtimeMainActivity();
-        var SpeechUtility = plus.android.importClass('com.iflytek.cloud.SpeechUtility');
-        SpeechUtility.createUtility(main, "appid=5a6ebba2");
-        var SynthesizerPlayer = plus.android.importClass('com.iflytek.cloud.SpeechSynthesizer');
-        play = SynthesizerPlayer.createSynthesizer(main, null);
-        play.startSpeaking(transformword, receiver);
-      }
-
-      // 时间戳
-      function dateTime() {
-        var date = new Date();
-        var month = date.getMonth() + 1;
-        var day = date.getDate();
-        var hour = date.getHours();
-        var minute = date.getMinutes();
-        var second = date.getSeconds();
-        if(month < 10) {
-          month = "0" + month.toString()
-        };
-        if(day < 10) {
-          day = "0" + day.toString()
-        };
-        if(hour < 10) {
-          hour = "0" + hour.toString()
-        };
-        if(minute < 10) {
-          minute = "0" + minute.toString()
-        };
-        if(second < 10) {
-          second = "0" + second.toString()
-        };
-        datetime = date.getFullYear().toString() + month + day + hour + minute + second;
-      }
-      dateTime();
     </script>
     <style type="text/css">
       #slider img {
@@ -402,41 +217,26 @@
   </head>
 
   <body>
-    <div class="mui-slider" id="slider">
+    <div id="screensaver" style="position: fixed;left:0;top:0;overflow:hidden;width: 100%;height: 100%;background-color: #000000;background-image: url('');background-size: cover;background-position: 50% 50%;background-repeat: no-repeat;z-index: 999;display: none;">
+
+    </div>
+
+    <div class="mui-slider" id="slider" style="display: block;">
       <div class="mui-slider-group mui-slider-loop">
         <div class="mui-slider-item mui-slider-item-duplicate">
           <a href="#"><img src="images/banner2.jpg" /></a>
         </div>
         <div class="mui-slider-item">
-          <a href="#"><img src="images/banner1.jpg" /></a>
-        </div>
-        <div class="mui-slider-item">
           <a href="#"><img src="images/banner2.jpg" /></a>
         </div>
         <div class="mui-slider-item mui-slider-item-duplicate">
-          <a href="#"><img src="images/banner1.jpg" /></a>
+          <a href="#"><img src="images/banner2.jpg" /></a>
         </div>
       </div>
     </div>
 
-    <div class="c_bg">
-      <img src="images/center.png" />
-    </div>
-
-    <span style="font-size: 8rem!important;position: absolute;top: 50%;right: 1%;z-index: 111;"><img src="images/voice.png"/ style="width: 5.3rem;" onclick="startRecognize()"></span>
-    <span style="font-size: 8rem!important;position: absolute;top: 54%;right: 1%;z-index: 111;"><img src="images/clear.png"/ style="width: 6rem;" onclick="init()"></span>
-    <span style="font-size: 8rem!important;position: absolute;top: 60%;right: 1%;z-index: 111;"><img src="images/picture.png"/ style="width: 4.5rem;" onclick="showSlider()"></span>
-
-    <div class="mui-scroll-wrapper" id="chatbox">
-      <div id="" class="mui-scroll">
-        <div class="chatbox_left clearfix">
-          <p>您好,很高兴为您服务</p>
-        </div>
-        <!--<div class="chatbox_right clearfix">
-          <p>奥斯卡进度更快了解来看淀区留学生创业园。2007年10月，国家人事部和北京市人民政府共建单位——中国北京（海淀）留学人员创业园。经过多年的建设，海淀创业园已经拥有三大孵化基地，培育了一批又一批的优秀企业和企业家，得到了党和国家领导人、</p>
-        </div>-->
-      </div>
-    </div>
+    <script src="js/particles.min.js"></script>
+    <script src="js/app.js"></script>
   </body>
 
 </html>
